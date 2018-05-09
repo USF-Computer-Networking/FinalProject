@@ -37,8 +37,6 @@ static struct options {
 
 #define OPTION(t, p) { t, offsetof(struct options, p), 1 }
 
-/* Command line option specification. We can add more here. If we're interested
- * in a string, specify --opt=%s .*/
 static const struct fuse_opt option_spec[] = {
     OPTION("-h", show_help),
     OPTION("--help", show_help),
@@ -59,30 +57,13 @@ static int netfs_getattr(
     int res = 0;
 
     if (strcmp(path, "/") == 0) {
-        /* This is the root directory. We have hard-coded the permissions to 755
-         * here, but you should apply the permissions from the remote directory
-         * instead. The mode means:
-         *   - S_IFDIR: this is a directory
-         *   - 0755: user can read, write, execute. All others can read+execute.
-         * The number of links refers to how many hard links point to the file.
-         * If the link count reaches 0, the file is effectively deleted (this is
-         * why deleting a file is actually 'unlinking' it).
-         */
         stbuf->st_mode = S_IFDIR | 0755;
         stbuf->st_nlink = 2;
     } else if (strcmp(path+1, "test_file") == 0) {
-        /* Incrementing the path pointer by 1 will remove the '/' from the start
-         * of the path. We're comparing it with a hard-coded file name.
-         *   - S_IFREG: indicates a regular file
-         * We also hard-code the size of this file based on its contents: 'hello
-         * world!' */
         stbuf->st_mode = S_IFREG | 0444;
         stbuf->st_nlink = 1;
         stbuf->st_size = strlen(TEST_DATA);
     } else {
-        /* -ENOENT = 'no such file or directory'. In other words, this demo code
-         * only supports the root directory and a single file named
-         * "test_file" */
         res = -ENOENT;
     }
 
@@ -102,10 +83,10 @@ static int netfs_readdir(
     req_header.msg_type = MSG_READDIR;
     req_header.msg_len = strlen(path) + 1;
 
-    /* Need to get server hostname from command line args, make global variable? */
+   
     int server_fd = connect_to(options.server_name, DEFAULT_PORT);
     if (server_fd < 0) {
-    	/* do something */
+    	perror("connect");       
     }
     write_len(server_fd, &req_header, sizeof(struct netfs_msg_header));
     write_len(server_fd, path, req_header.msg_len);
@@ -114,6 +95,7 @@ static int netfs_readdir(
     do {
     	read_len(server_fd, &reply_len, sizeof(uint16_t));
 	read_len(server_fd, reply_path, reply_len);
+	filler(buf, reply_path, NULL, 0, 0);
 	printf("-> %s\n", reply_path);
     } while (reply_len > 0);
     
@@ -122,10 +104,8 @@ static int netfs_readdir(
     if (strcmp(path, "/") != 0) {
         return -ENOENT;
     } else {
-        /* Create our . and .. directory links */
         filler(buf, ".", NULL, 0, 0);
         filler(buf, "..", NULL, 0, 0);
-
         /* Create our single test file */
         filler(buf, "test_file", NULL, 0, 0);
     }
@@ -139,9 +119,6 @@ static int netfs_open(const char *path, struct fuse_file_info *fi) {
 
     /* By default, we will return 0 from this function (success) */
     int res = 0;
-
-    /* Once again, incrementing the path pointer by 1 will remove the '/' from
-     * the start of the path. We compare it with our test file. */
     if (strcmp(path+1, "test_file") != 0) {
         return -ENOENT;
     }
