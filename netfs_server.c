@@ -59,9 +59,6 @@ void execute_command(int fd) {
 }
 
 int main(int argc, char *argv[]) {
-
-    /* This starter code will initialize the server port and wait to receive a
-     * message. */
     /* chdir into directory as specified by user */
     int d = chdir(argv[1]);
     if (d < 0) {
